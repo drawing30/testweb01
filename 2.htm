@@ -745,7 +745,7 @@ if (useNaturalVoice) {
                 const card = document.createElement('div');
                 card.className = `card ${learnedWords.has(word.id) ? 'learned' : ''}`;
                 let charHtml = '';
-                let speakText = word.traditional; // 預設朗讀繁體
+                let speakText = word.simplified; // 如預設朗讀繁體:  word.traditional
 
                 // 4種顯示模式邏輯（原始程式完全不動）
                 switch(mode) {
