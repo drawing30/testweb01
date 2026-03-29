@@ -45,146 +45,155 @@ body.noscroll { overflow:hidden; }
 
 <!DOCTYPE html>
 <html lang="zh-CN">
-<!--
-  中文詞彙學習工具 - 完整版繁體註解 + 卡片懸浮提示(分類+ID)
-  核心功能：CSV詞彙匯入、多維度篩選、4種漢字顯示模式、學習進度統計、語音朗讀
-  新增功能：卡片懸浮Tooltip顯示 分類+ID，無侵入式修改，完全保留原始功能
-  相容CSV表頭：id,tc,sc,py,mean / id,traditional,simplified,pinyin,meaning
-  無後端依賴，純前端本機執行，資料本機儲存
--->
+<!-- ==============================================
+  项目名称：中文词汇学习工具 - 完整版（带精准导出）
+  核心定位：纯前端本地运行，无后端依赖，数据本地存储
+  兼容格式：CSV导入(id,tc,sc,py,mean / id,traditional,simplified,pinyin,meaning)
+  核心功能：CSV导入、多维度筛选、4种汉字显示、学习统计、语音朗读、三层分组、精准导出
+  新增功能：导出当前页面实际显示词汇（CSV/Excel/Word），严格匹配筛选/分类/分组/排序结果
+  适用场景：中文繁简词汇学习、单词卡片记忆、学习进度本地保存、筛选后数据导出
+============================================== -->
 <head>
+    <!-- 基础元数据：字符编码、响应式适配、页面标题 -->
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Chinese Vocabulary Master</title>
+    <title>Chinese Vocabulary Master | 中文词汇学习工具</title>
     <style>
-        /* 全域樣式重置：清除瀏覽器預設邊距，統一盒模型 */
+        /* ==============================================
+           全局样式重置模块
+           作用：清除浏览器默认样式，统一盒模型，设置全局字体
+        ============================================== */
         * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-            font-family: 'Noto Sans SC', 'Microsoft YaHei', sans-serif;
+            margin: 0; /* 清除默认外边距 */
+            padding: 0; /* 清除默认内边距 */
+            box-sizing: border-box; /* 统一盒模型，宽高包含内边距/边框 */
+            font-family: 'Noto Sans SC', 'Microsoft YaHei', sans-serif; /* 全局中文字体 */
         }
 
-        /* 頁面背景：漸層底色，滿版顯示 */
+        /* ==============================================
+           页面主体样式
+           作用：设置渐变背景、最小高度、内边距，保证页面铺满屏幕
+        ============================================== */
         body {
             background: linear-gradient(135deg, #f093fb 0%, #f5576c 50%, #4facfe 100%);
-            min-height: 100vh;
-            padding: 20px;
+            min-height: 100vh; /* 最小高度=屏幕高度 */
+            padding: 20px; /* 全局内边距 */
         }
 
-        /* 固定選單切換按鈕：永遠顯示在左上角，不會被隱藏 */
+        /* ==============================================
+           固定菜单切换按钮
+           作用：左上角固定悬浮，控制功能菜单显示/隐藏，永不被遮挡
+        ============================================== */
         .toggle-btn {
-            position: fixed;
-            top: 10px; left: 10px;
-            z-index: 101;
-            padding: 8px 16px;
-            background: #007bff;
-            color: white;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            font-weight: bold;
+            position: fixed; /* 固定定位 */
+            top: 10px; left: 10px; /* 左上角位置 */
+            z-index: 101; /* 最高层级，优先显示 */
+            padding: 8px 16px; /* 按钮内边距 */
+            background: #007bff; /* 按钮背景色 */
+            color: white; /* 文字颜色 */
+            border: none; /* 无边框 */
+            border-radius: 4px; /* 圆角 */
+            cursor: pointer; /* 鼠标悬浮手势 */
+            font-weight: bold; /* 文字加粗 */
         }
-        .toggle-btn:hover { background: #0056b3; }
+        .toggle-btn:hover { background: #0056b3; } /* 悬浮变色 */
 
-        /* 載入彈窗 + 進度條：CSV匯入時顯示 */
+        /* ==============================================
+           CSV加载弹窗 + 进度条
+           作用：导入大文件时显示加载状态，提升用户体验
+        ============================================== */
         #loading {
-            position: fixed;
+            position: fixed; /* 屏幕居中固定 */
             top: 50%; left: 50%;
             transform: translate(-50%, -50%);
             background: white;
             padding: 20px;
             border-radius: 8px;
             box-shadow: 0 0 20px rgba(0,0,0,0.2);
-            z-index: 200;
-            display: none;
+            z-index: 200; /* 高于菜单层级 */
+            display: none; /* 默认隐藏 */
         }
-        .progress-container {
-            width: 300px;
-            height: 10px;
-            background: #eee;
-            border-radius: 5px;
-            margin-top: 10px;
-            overflow: hidden;
-        }
-        .progress-bar {
-            height: 100%;
-            background: #28a745;
-            width: 0%;
-            transition: width 0.2s ease;
-        }
+        .progress-container { width: 300px; height: 10px; background: #eee; border-radius: 5px; margin-top: 10px; overflow: hidden; }
+        .progress-bar { height: 100%; background: #28a745; width: 0%; transition: width 0.2s ease; }
 
-        /* 提示訊息框：錯誤/成功提示，右上角懸浮 */
+        /* ==============================================
+           操作提示框
+           作用：右上角悬浮提示成功/错误信息，自动消失
+        ============================================== */
         #error-message {
             position: fixed;
             top: 20px; right: 20px;
             padding: 15px 20px;
             border-radius: 4px;
             color: white;
-            z-index: 300;
+            z-index: 300; /* 最高提示层级 */
             display: none;
             max-width: 300px;
         }
-        .error { background: #dc3545; }
-        .success { background: #28a745; }
+        .error { background: #dc3545; }    /* 错误：红色 */
+        .success { background: #28a745; } /* 成功：绿色 */
 
-        /* 控制台選單：吸頂效果，整合所有功能按鈕+統計 */
+        /* ==============================================
+           主功能菜单
+           作用：吸顶悬浮，整合所有操作按钮，半透明背景
+        ============================================== */
         #menu {
             background: rgba(255,255,255,0.95);
             padding: 20px;
             border-radius: 12px;
             box-shadow: 0 4px 20px rgba(0,0,0,0.1);
             margin: 60px 0 20px;
-            position: sticky;
+            position: sticky; /* 吸顶定位 */
             top: 0;
             z-index: 100;
         }
         .control-group {
-            display: inline-block;
+            display: inline-block; /* 横向排列控件 */
             margin: 8px 15px 8px 0;
             vertical-align: middle;
         }
-        .control-group label {
-            margin-right: 8px;
-            font-weight: 500;
-            color: #333;
-        }
-        /* 內聯學習統計：整合在選單內，無懸浮面板 */
-        .stats-inline {
-            background: #f8f9fa;
-            padding: 6px 12px;
-            border-radius: 4px;
-            font-size: 13px;
-            color: #333;
-        }
-        input, select, button {
-            padding: 6px 10px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            outline: none;
-        }
-        button {
-            background: #6c5ce7;
-            color: white;
-            border: none;
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-        button:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
-        }
+        .control-group label { margin-right: 8px; font-weight: 500; color: #333; }
+        .stats-inline { background: #f8f9fa; padding: 6px 12px; border-radius: 4px; font-size: 13px; color: #333; }
+
+        /* 输入框/下拉框/按钮基础样式 */
+        input, select, button { padding: 6px 10px; border: 1px solid #ddd; border-radius: 4px; outline: none; }
+        button { background: #6c5ce7; color: white; border: none; cursor: pointer; transition: all 0.2s; }
+        button:hover { transform: translateY(-2px); box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
         button:active { transform: translateY(0); }
 
-        /* 詞彙卡片網格：自適應配置，支援動態調整卡片大小 */
-        :root { --card-size: 140px; }
-        #cards {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(var(--card-size), 1fr));
-            gap: 15px;
-            margin-top: 20px;
+        /* ==============================================
+           三层分组展示样式
+           作用：分组标题+卡片网格布局，清晰区分词汇分组
+        ============================================== */
+        .group-section { margin-bottom: 25px; }
+        .group-title {
+            background: rgba(255,255,255,0.9);
+            padding: 8px 15px;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            font-weight: bold;
+            color: #2c3e50;
+            font-size: 14px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            border-left: 4px solid #6c5ce7; /* 左侧紫色标识 */
         }
-        /* 卡片基礎樣式：支援4種顯示模式，懸浮動效，已學習標記 */
+
+        /* ==============================================
+           词汇卡片网格样式
+           作用：响应式网格，自适应屏幕宽度，自定义卡片大小
+        ============================================== */
+        :root { --card-size: 140px; } /* 卡片尺寸全局变量 */
+        #cards { margin-top: 20px; }
+        .card-grid {
+            display: grid; /* 网格布局 */
+            grid-template-columns: repeat(auto-fill, minmax(var(--card-size), 1fr));
+            gap: 15px; /* 卡片间距 */
+        }
+
+        /* ==============================================
+           词汇卡片样式
+           作用：正方形卡片、悬浮动效、已学习状态标识
+        ============================================== */
         .card {
             background: white;
             border-radius: 12px;
@@ -193,64 +202,28 @@ body.noscroll { overflow:hidden; }
             box-shadow: 0 2px 10px rgba(0,0,0,0.1);
             transition: all 0.3s ease;
             cursor: pointer;
-            aspect-ratio: 1/1;
+            aspect-ratio: 1/1; /* 正方形 */
             display: flex;
             flex-direction: column;
             justify-content: center;
             align-items: center;
             gap: 4px;
-            /* 為Tooltip新增相對定位 */
-            position: relative;
+            position: relative; /* 为悬浮提示定位 */
         }
-        .card:hover {
-            transform: scale(1.05);
-            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
-            background: linear-gradient(135deg, #e3f2fd, #f3e5f5);
-        }
-        /* 已學習卡片樣式：綠色漸層標記 */
-        .card.learned {
-            background: linear-gradient(135deg, #d4edda, #c3e6cb);
-            border: 2px solid #28a745;
-        }
-        /* 漢字組樣式：相容繁簡雙顯模式 */
-        .char-group {
-            display: flex;
-            flex-direction: column;
-            gap: 2px;
-            align-items: center;
-        }
-        /* 主文字：大字加粗（當前選取的主要漢字） */
-        .primary-char {
-            font-size: clamp(1.2rem, 4vw, 2.3rem);
-            font-weight: bold;
-            color: #2c3e50;
-        }
-        /* 次文字：小字灰色（輔助顯示的漢字） */
-        .secondary-char {
-            font-size: clamp(0.9rem, 3vw, 1.8rem);
-            color: #7f8c8d;
-        }
-        .pinyin {
-            font-size: clamp(0.7rem, 1.8vw, 0.9rem);
-            color: #e74c3c;
-            font-weight: 500;
-        }
-        .meaning {
-            font-size: clamp(0.6rem, 1.5vw, 0.8rem);
-            color: #888;
-            line-height: 1.2;
-        }
-        /* 空資料提示：無詞彙時顯示 */
-        #empty-state {
-            grid-column: 1 / -1;
-            text-align: center;
-            color: white;
-            font-size: 1.2rem;
-            padding: 40px;
-        }
+        .card:hover { transform: scale(1.05); box-shadow: 0 5px 15px rgba(0,0,0,0.2); background: linear-gradient(135deg, e3f2fd, #f3e5f5); }
+        .card.learned { background: linear-gradient(135deg, #d4edda, #c3e6cb); border: 2px solid #28a745; } /* 已学习样式 */
 
-        /* ==================== 新增：卡片懸浮Tooltip樣式（純CSS，無侵入式） ==================== */
-        /* 卡片提示框：懸浮顯示分類+ID，預設隱藏 */
+        /* 卡片文字层级样式：主文字/次文字/拼音/释义 */
+        .char-group { display: flex; flex-direction: column; gap: 2px; align-items: center; }
+        .primary-char { font-size: clamp(1.2rem, 4vw, 2.3rem); font-weight: bold; color: #2c3e50; }
+        .secondary-char { font-size: clamp(0.9rem, 3vw, 1.8rem); color: #7f8c8d; }
+        .pinyin { font-size: clamp(0.7rem, 1.8vw, 0.9rem); color: #e74c3c; font-weight: 500; }
+        .meaning { font-size: clamp(0.6rem, 1.5vw, 0.8rem); color: #888; line-height: 1.2; }
+
+        /* ==============================================
+           卡片悬浮提示(Tooltip)
+           作用：鼠标悬浮显示分类+ID，纯CSS实现
+        ============================================== */
         .card-tooltip {
             position: absolute;
             bottom: 105%;
@@ -268,12 +241,7 @@ body.noscroll { overflow:hidden; }
             z-index: 999;
             pointer-events: none;
         }
-        /* 卡片懸浮時顯示提示框 */
-        .card:hover .card-tooltip {
-            opacity: 1;
-            visibility: visible;
-        }
-        /* Tooltip小箭頭 */
+        .card:hover .card-tooltip { opacity: 1; visibility: visible; }
         .card-tooltip::after {
             content: '';
             position: absolute;
@@ -285,198 +253,131 @@ body.noscroll { overflow:hidden; }
             border-color: #2c3e50 transparent transparent transparent;
         }
 
-        /* 響應式相容：手機端選單配置調整 */
+        /* 空数据提示样式 */
+        #empty-state { text-align: center; color: white; font-size: 1.2rem; padding: 40px; }
+
+        /* ==============================================
+           响应式适配：手机端垂直排列控件
+        ============================================== */
         @media (max-width: 768px) {
-            .control-group {
-                display: block;
-                margin: 10px 0;
-            }
+            .control-group { display: block; margin: 10px 0; }
         }
     </style>
 </head>
 <body>
-    <!-- 固定選單切換按鈕：永遠可見，解決隱藏後無法顯示的問題 -->
+    <!-- 固定菜单切换按钮：解决菜单隐藏后无法恢复的问题 -->
     <button id="toggleMenuBtn" class="toggle-btn">Hide Menu</button>
 
-    <!-- CSV載入彈窗 + 上傳進度條：限制5MB檔案大小 -->
+    <!-- CSV加载弹窗：处理文件时显示 -->
     <div id="loading">
         <div>Processing CSV File...</div>
-        <div class="progress-container">
-            <div class="progress-bar" id="progressBar"></div>
-        </div>
+        <div class="progress-container"><div class="progress-bar" id="progressBar"></div></div>
     </div>
 
-    <!-- 操作提示框：錯誤/成功資訊 -->
+    <!-- 操作结果提示框：成功/错误提示 -->
     <div id="error-message"></div>
 
-    <!-- 主控制台：整合所有功能 + 學習統計 -->
+    <!-- 主功能菜单：所有操作控件整合区 -->
     <div id="menu">
-        <!-- 1. CSV匯入模組：支援多檔案/分類匯入，最大5MB -->
+        <!-- 1. CSV导入模块：支持多文件、分类管理、5MB大小限制 -->
         <div class="control-group">
             <label>Import CSV (Max 5MB):</label>
             <input type="file" id="csvFile" accept=".csv" multiple>
-            <select id="categorySelector" style="display:none;">
-                <option value="all">All Categories</option>
-            </select>
+            <select id="categorySelector" style="display:none;"><option value="all">All Categories</option></select>
         </div>
 
-        <!-- 2. 學習進度統計：整合在選單內，即時更新 -->
+        <!-- 2. 学习进度统计：实时更新总词数/已学/剩余 -->
         <div class="control-group">
             <div class="stats-inline">
-                Total: <span id="totalCount">0</span> | 
-                Learned: <span id="learnedCount">0</span> | 
-                Remaining: <span id="remainingCount">0</span>
+                Total: <span id="totalCount">0</span> | Learned: <span id="learnedCount">0</span> | Remaining: <span id="remainingCount">0</span>
             </div>
         </div>
 
-        <!-- 3. 關鍵字搜尋：支援漢字/拼音/釋義搜尋 -->
-        <div class="control-group">
-            <label>Search:</label>
-            <input type="text" id="search" placeholder="Search chars/pinyin/meaning">
-        </div>
+        <!-- 3. 三层嵌套分组：主分组+二级子组+三级子组 -->
+        <div class="control-group"><label>Group Level 1 (Main):</label><select id="groupLevel1"><option value="none">No Group</option><option value="fixedCount">Fixed Count</option><option value="idRange">ID Range</option><option value="pinyinInitial">Pinyin Initial</option><option value="charCount">Character Count</option></select></div>
+        <div class="control-group"><label>Level 2 (Sub):</label><select id="groupLevel2"><option value="none">None</option><option value="tone">Tone</option><option value="charCount">Character Count</option><option value="pinyinInitial">Pinyin Initial</option><option value="fullPinyin">Full Pinyin</option></select></div>
+        <div class="control-group"><label>Level 3 (Sub):</label><select id="groupLevel3"><option value="none">None</option><option value="tone">Tone</option><option value="charCount">Character Count</option><option value="pinyinInitial">Pinyin Initial</option><option value="fullPinyin">Full Pinyin</option></select></div>
 
-        <!-- 4. 字數篩選：拆分1-10獨立選項 + 10+字數 -->
+        <!-- 4. 关键词搜索：支持汉字/拼音/释义模糊搜索 -->
+        <div class="control-group"><label>Search:</label><input type="text" id="search" placeholder="Search chars/pinyin/meaning"></div>
+
+        <!-- 5. 字数筛选：1-10字+10字以上 -->
+        <div class="control-group"><label>Character Count:</label><select id="charFilter"><option value="all">All</option><option value="1">1 Char</option><option value="2">2 Chars</option><option value="3">3 Chars</option><option value="4">4 Chars</option><option value="5">5 Chars</option><option value="6">6 Chars</option><option value="7">7 Chars</option><option value="8">8 Chars</option><option value="9">9 Chars</option><option value="10">10 Chars</option><option value="10+">10+ Chars</option></select></div>
+
+        <!-- 6. 拼音首字母筛选：支持声调匹配 -->
+        <div class="control-group"><label>Pinyin Initial:</label><select id="pinyinInitialFilter"><option value="all">All</option><option value="a">a, ā, á, ǎ, à</option><option value="b">b</option><option value="c">c</option><option value="d">d</option><option value="e">e, ē, é, ě, è</option><option value="f">f</option><option value="g">g</option><option value="h">h</option><option value="i">i, ī, í, ǐ, ì</option><option value="j">j</option><option value="k">k</option><option value="l">l</option><option value="n">n</option><option value="o">o, ō, ó, ǒ, ò</option><option value="p">p</option><option value="q">q</option><option value="r">r</option><option value="s">s</option><option value="t">t</option><option value="u">u, ū, ú, ǔ, ù</option><option value="v">v</option><option value="w">w</option><option value="x">x</option><option value="y">y</option><option value="z">z</option></select></div>
+
+        <!-- 7. 完整拼音精准筛选 -->
+        <div class="control-group"><label>Full Pinyin:</label><input type="text" id="pinyinFilter" placeholder="e.g., hao, nǐ"></div>
+
+        <!-- 8. 排序功能：ID/拼音/字数，正序/倒序 -->
+        <div class="control-group"><label>Sort:</label><select id="sortOption"><option value="id">Default ID</option><option value="pinyin">Pinyin</option><option value="length">Character Length</option></select><select id="sortOrder"><option value="asc">Asc</option><option value="desc">Desc</option></select></div>
+
+        <!-- 9. 汉字显示模式：4种繁简组合 -->
+        <div class="control-group"><label>Display Mode:</label><select id="displayMode"><option value="tc_only">Traditional Only (TC)</option><option value="sc_only">Simplified Only (SC)</option><option value="tc_sc">TC + SC (TC Top)</option><option value="sc_tc">SC + TC (SC Top)</option></select></div>
+
+        <!-- 10. 卡片大小调节：滑动条动态调整 -->
+        <div class="control-group"><label>Card Size:</label><input type="range" id="cardSize" min="80" max="300" value="140"></div>
+
+        <!-- 11. 随机卡片：自定义随机数量 -->
+        <div class="control-group"><label>Random Cards:</label><input type="number" id="randomCount" min="1" value="20" style="width:60px;"><button onclick="randomCards()">Generate</button></div>
+
+        <!-- 12. 清除已学习记录：重置本地存储 -->
+        <div class="control-group"><button onclick="clearLearned()">Clear Learned Words</button></div>
+
+        <!-- 13. 语音朗读切换：标准/自然语音 -->
+        <div class="control-group"><button id="voiceToggleBtn" onclick="toggleVoice()">Normal</button></div>
+
+        <!-- ==================== 精准导出功能：菜单最后位置，导出当前显示的所有卡片 ==================== -->
         <div class="control-group">
-            <label>Character Count:</label>
-            <select id="charFilter">
-                <option value="all">All</option>
-                <option value="1">1 Char</option>
-                <option value="2">2 Chars</option>
-                <option value="3">3 Chars</option>
-                <option value="4">4 Chars</option>
-                <option value="5">5 Chars</option>
-                <option value="6">6 Chars</option>
-                <option value="7">7 Chars</option>
-                <option value="8">8 Chars</option>
-                <option value="9">9 Chars</option>
-                <option value="10">10 Chars</option>
-                <option value="10+">10+ Chars</option>
+            <label>Export Displayed:</label>
+            <select id="exportFormat">
+                <option value="csv">CSV File</option>
+                <option value="excel">Excel File</option>
+                <option value="word">Word File</option>
             </select>
-        </div>
-
-        <!-- 5. 拼音首字母篩選：支援a-z+帶聲母韻母 -->
-        <div class="control-group">
-            <label>Pinyin Initial:</label>
-            <select id="pinyinInitialFilter">
-                <option value="all">All</option>
-                <option value="a">a, ā, á, ǎ, à</option>
-                <option value="b">b</option>
-                <option value="c">c</option>
-                <option value="d">d</option>
-                <option value="e">e, ē, é, ě, è</option>
-                <option value="f">f</option>
-                <option value="g">g</option>
-                <option value="h">h</option>
-                <option value="i">i, ī, í, ǐ, ì</option>
-                <option value="j">j</option>
-                <option value="k">k</option>
-                <option value="l">l</option>
-                <option value="n">n</option>
-                <option value="o">o, ō, ó, ǒ, ò</option>
-                <option value="p">p</option>
-                <option value="q">q</option>
-                <option value="r">r</option>
-                <option value="s">s</option>
-                <option value="t">t</option>
-                <option value="u">u, ū, ú, ǔ, ù</option>
-                <option value="v">v</option>
-                <option value="w">w</option>
-                <option value="x">x</option>
-                <option value="y">y</option>
-                <option value="z">z</option>
-            </select>
-        </div>
-
-        <!-- 6. 完整拼音篩選：支援帶聲調精準搜尋 -->
-        <div class="control-group">
-            <label>Full Pinyin:</label>
-            <input type="text" id="pinyinFilter" placeholder="e.g., hao, nǐ">
-        </div>
-
-        <!-- 7. 排序功能：依ID/拼音/字數排序 -->
-        <div class="control-group">
-            <label>Sort:</label>
-            <select id="sortOption">
-                <option value="id">Default ID</option>
-                <option value="pinyin">Pinyin</option>
-                <option value="length">Character Length</option>
-            </select>
-            <select id="sortOrder">
-                <option value="asc">Asc</option>
-                <option value="desc">Desc</option>
-            </select>
-        </div>
-
-        <!-- 8. 4種漢字顯示模式：核心升級功能 -->
-        <div class="control-group">
-            <label>Display Mode:</label>
-            <select id="displayMode">
-                <option value="tc_only">Traditional Only (TC)</option>
-                <option value="sc_only">Simplified Only (SC)</option>
-                <option value="tc_sc">TC + SC (TC Top)</option>
-                <option value="sc_tc">SC + TC (SC Top)</option>
-            </select>
-        </div>
-
-        <!-- 9. 卡片大小調整：滑桿動態調整 -->
-        <div class="control-group">
-            <label>Card Size:</label>
-            <input type="range" id="cardSize" min="80" max="300" value="140">
-        </div>
-
-        <!-- 10. 隨機卡片：自訂數量，非固定20張 -->
-        <div class="control-group">
-            <label>Random Cards:</label>
-            <input type="number" id="randomCount" min="1" value="20" style="width:60px;">
-            <button onclick="randomCards()">Generate</button>
-        </div>
-
-        <!-- 11. 清除已學習詞彙 -->
-        <div class="control-group">
-            <button onclick="clearLearned()">Clear Learned Words</button>
-        </div>
-
-        <!-- 12. 使用自然語言 -->
-        <div class="control-group">
-            <button id="voiceToggleBtn" onclick="toggleVoice()">Normal</button>
+            <button onclick="exportCurrentVocab()">Export Now</button>
         </div>
     </div>
 
-    <!-- 詞彙卡片容器 -->
+    <!-- 词汇卡片展示容器 -->
     <div id="cards"></div>
-    <!-- 無資料提示 -->
+    <!-- 无数据提示 -->
     <div id="empty-state" style="display:none;">No vocabulary found. Import a CSV file to start!</div>
 
     <script>
-        // ==================== 全域變數定義 ====================
-        // 原始詞彙資料
-        let vocabulary = [];
-        // 篩選後的詞彙資料
-        let filteredVocab = [];
-        // 已學習詞彙ID集合（本機儲存）
-        let learnedWords = new Set();
-        // 詞彙分類資料（多CSV檔案匯入）
-        let categories = { all: [] };
-        // CSV檔案大小限制：5MB
-        const MAX_CSV_SIZE = 5 * 1024 * 1024;
+        // ==============================================
+        // 全局变量定义：存储核心数据，避免重复声明
+        // ==============================================
+        let vocabulary = [];          // 原始全部词汇数组
+        let filteredVocab = [];       // 筛选后当前展示的词汇数组（导出数据源）
+        let learnedWords = new Set(); // 已学习词汇ID集合（本地存储）
+        let categories = { all: [] }; // 多CSV文件分类管理
+        const MAX_CSV_SIZE = 5 * 1024 * 1024; // CSV文件大小限制：5MB
 
-        // ==================== DOM元素取得 ====================
+        // ==============================================
+        // DOM元素缓存：避免重复查询DOM，提升性能
+        // ==============================================
         const errorMsg = document.getElementById('error-message');
         const loading = document.getElementById('loading');
         const progressBar = document.getElementById('progressBar');
         const cardsContainer = document.getElementById('cards');
         const emptyState = document.getElementById('empty-state');
 
-        // ==================== 頁面初始化 ====================
+        // ==============================================
+        // 页面初始化：DOM加载完成后执行
+        // ==============================================
         document.addEventListener('DOMContentLoaded', () => {
-            loadLearnedWords();    // 載入本機儲存的已學習詞彙
-            updateCardSize();      // 初始化卡片大小
-            bindEvents();          // 綁定所有事件
-            updateStats();          // 初始化學習統計
-            toggleMenu();           // 初始化選單顯示狀態
+            loadLearnedWords();    // 加载本地存储的已学习记录
+            updateCardSize();      // 初始化卡片尺寸
+            bindEvents();          // 绑定所有交互事件
+            updateStats();          // 更新学习统计
+            toggleMenu();           // 初始化菜单显示状态
         });
 
-        // ==================== 事件綁定統一管理 ====================
+        // ==============================================
+        // 事件绑定统一管理：所有交互事件集中绑定
+        // ==============================================
         function bindEvents() {
             document.getElementById('csvFile').addEventListener('change', handleCSVUpload);
             document.getElementById('search').addEventListener('input', applyAllFilters);
@@ -489,9 +390,15 @@ body.noscroll { overflow:hidden; }
             document.getElementById('cardSize').addEventListener('input', updateCardSize);
             document.getElementById('categorySelector').addEventListener('change', applyCategoryFilter);
             document.getElementById('toggleMenuBtn').addEventListener('click', toggleMenu);
+            // 三层分组事件
+            document.getElementById('groupLevel1').addEventListener('change', applyAllFilters);
+            document.getElementById('groupLevel2').addEventListener('change', applyAllFilters);
+            document.getElementById('groupLevel3').addEventListener('change', applyAllFilters);
         }
 
-        // ==================== 核心功能1：選單切換（永遠可見按鈕） ====================
+        // ==============================================
+        // 功能1：菜单显示/隐藏切换
+        // ==============================================
         function toggleMenu() {
             const menu = document.getElementById('menu');
             const btn = document.getElementById('toggleMenuBtn');
@@ -500,41 +407,34 @@ body.noscroll { overflow:hidden; }
             btn.textContent = isHidden ? 'Hide Menu' : 'Show Menu';
         }
 
-        // ==================== 核心功能2：學習進度統計（即時更新） ====================
+        // ==============================================
+        // 功能2：更新学习进度统计
+        // ==============================================
         function updateStats() {
             const total = filteredVocab.length;
             const learned = [...learnedWords].filter(id => filteredVocab.some(v => v.id === id)).length;
             const remaining = total - learned;
-
             document.getElementById('totalCount').textContent = total;
             document.getElementById('learnedCount').textContent = learned;
             document.getElementById('remainingCount').textContent = remaining;
         }
 
-        // ==================== 核心功能3：CSV檔案上傳（大小限制+進度條） ====================
+        // ==============================================
+        // 功能3：CSV文件上传与解析
+        // ==============================================
         async function handleCSVUpload(e) {
             const files = e.target.files;
             if (!files.length) return;
 
             for (const file of files) {
-                // 驗證檔案大小
-                if (file.size > MAX_CSV_SIZE) {
-                    showError(`File ${file.name} exceeds 5MB limit!`, true);
-                    continue;
-                }
-
+                if (file.size > MAX_CSV_SIZE) { showError(`File ${file.name} exceeds 5MB limit!`, true); continue; }
                 loading.style.display = 'block';
                 const reader = new FileReader();
 
-                // 上傳進度條
-                reader.onprogress = (event) => {
-                    if (event.lengthComputable) {
-                        const percent = (event.loaded / event.total) * 100;
-                        progressBar.style.width = percent + '%';
-                    }
-                };
-
-                // 檔案讀取完成
+                // 加载进度条
+                reader.onprogress = (event) => { if (event.lengthComputable) progressBar.style.width = (event.loaded / event.total)*100 + '%'; };
+                
+                // 读取完成
                 reader.onload = (event) => {
                     try {
                         const data = parseCSVRobust(event.target.result);
@@ -543,331 +443,206 @@ body.noscroll { overflow:hidden; }
                         categories.all = [...categories.all, ...data];
                         vocabulary = [...categories.all];
                         filteredVocab = [...vocabulary];
-                        
                         updateCategorySelector();
                         applyAllFilters();
                         showError(`Imported ${data.length} words from ${file.name}!`, false);
-                    } catch (err) {
-                        showError(`Parse Error: ${err.message}`, true);
-                    } finally {
-                        loading.style.display = 'none';
-                        progressBar.style.width = '0%';
-                    }
+                    } catch (err) { showError(`Parse Error: ${err.message}`, true);
+                    } finally { loading.style.display = 'none'; progressBar.style.width = '0%'; }
                 };
-
                 reader.readAsText(file);
             }
         }
 
-        // ==================== 核心功能4：詞彙分類管理（多CSV匯入） ====================
+        // ==============================================
+        // 功能4：分类选择器更新
+        // ==============================================
         function updateCategorySelector() {
             const selector = document.getElementById('categorySelector');
             selector.innerHTML = '<option value="all">All Categories</option>';
-            
-            Object.keys(categories).forEach(cat => {
-                if (cat !== 'all') {
-                    const option = document.createElement('option');
-                    option.value = cat;
-                    option.textContent = cat;
-                    selector.appendChild(option);
-                }
-            });
+            Object.keys(categories).forEach(cat => { if(cat!=='all'){ const o=document.createElement('option');o.value=cat;o.textContent=cat;selector.appendChild(o); } });
             selector.style.display = 'inline-block';
         }
-
         function applyCategoryFilter() {
             const selected = document.getElementById('categorySelector').value;
-            vocabulary = selected === 'all' ? [...categories.all] : [...categories[selected]];
+            vocabulary = selected==='all' ? [...categories.all] : [...categories[selected]];
             applyAllFilters();
         }
 
-        // ==================== 核心功能5：多維度篩選系統 ====================
+        // ==============================================
+        // 功能5：多维度筛选总函数
+        // ==============================================
         function applyAllFilters() {
-            if (!vocabulary.length) {
-                filteredVocab = [];
-                renderCards();
-                return;
-            }
-
+            if(!vocabulary.length){ filteredVocab=[]; renderCards(); return; }
             let result = [...vocabulary];
             const search = document.getElementById('search').value.toLowerCase();
             const charFilter = document.getElementById('charFilter').value;
             const pinyinInitial = document.getElementById('pinyinInitialFilter').value;
             const pinyinFilter = document.getElementById('pinyinFilter').value.toLowerCase();
 
-            // 關鍵字篩選
-            if (search) {
-                result = result.filter(v => 
-                    v.simplified.toLowerCase().includes(search) ||
-                    v.traditional.toLowerCase().includes(search) ||
-                    v.pinyin.toLowerCase().includes(search) ||
-                    v.meaning.toLowerCase().includes(search)
-                );
-            }
-
-            // 字數篩選（1-10獨立選項）
-            if (charFilter !== 'all') {
-                result = result.filter(v => {
-                    const len = v.simplified.length;
-                    if(charFilter === '10+') return len >10;
-                    return len === parseInt(charFilter);
-                });
-            }
-
-            // 拼音首字母篩選（支援帶聲調韻母）
-            if (pinyinInitial !== 'all') {
-                const initialMap = {
-                    'a': /^[aāáǎà]/i, 'e': /^[eēéěè]/i, 'i': /^[iīíǐì]/i,
-                    'o': /^[oōóǒò]/i, 'u': /^[uūúǔù]/i
-                };
-                const regex = initialMap[pinyinInitial] || new RegExp(`^${pinyinInitial}`, 'i');
-                result = result.filter(v => regex.test(v.pinyin.trim()));
-            }
-
-            // 完整拼音篩選
-            if (pinyinFilter) {
-                const regex = new RegExp(pinyinFilter, 'i');
-                result = result.filter(v => regex.test(v.pinyin));
-            }
-
-            // 排序邏輯
-            const sortBy = document.getElementById('sortOption').value;
-            const order = document.getElementById('sortOrder').value === 'asc' ? 1 : -1;
+            // 关键词筛选
+            if(search) result = result.filter(v=>v.simplified.toLowerCase().includes(search)||v.traditional.toLowerCase().includes(search)||v.pinyin.toLowerCase().includes(search)||v.meaning.toLowerCase().includes(search));
+            // 字数筛选
+            if(charFilter!=='all') result=result.filter(v=>{const l=v.simplified.length;return charFilter==='10+'?l>10:l===parseInt(charFilter);});
+            // 拼音首字母筛选
+            if(pinyinInitial!=='all'){const m={'a':/^[aāáǎà]/i,'e':/^[eēéěè]/i,'i':/^[iīíǐì]/i,'o':/^[oōóǒò]/i,'u':/^[uūúǔù]/i};const r=m[pinyinInitial]||new RegExp(`^${pinyinInitial}`,'i');result=result.filter(v=>r.test(v.pinyin.trim()));}
+            // 完整拼音筛选
+            if(pinyinFilter){const r=new RegExp(pinyinFilter,'i');result=result.filter(v=>r.test(v.pinyin));}
+            // 排序
+            const s=document.getElementById('sortOption').value,o=document.getElementById('sortOrder').value==='asc'?1:-1;
+            result.sort((a,b)=>{if(s==='pinyin')return a.pinyin.localeCompare(b.pinyin)*o;if(s==='length')return(a.simplified.length-b.simplified.length)*o;return(a.id-b.id)*o;});
             
-            result.sort((a, b) => {
-                if (sortBy === 'pinyin') return a.pinyin.localeCompare(b.pinyin) * order;
-                if (sortBy === 'length') return (a.simplified.length - b.simplified.length) * order;
-                return (a.id - b.id) * order;
-            });
-
-            filteredVocab = result;
-            renderCards();
+            filteredVocab=result;renderCards();
         }
 
-        // ==================== 核心功能6：動態隨機卡片（自訂數量） ====================
+        // ==============================================
+        // 功能6：随机生成卡片
+        // ==============================================
         function randomCards() {
+            if(!filteredVocab.length){showError("No vocabulary to randomize!",true);return;}
+            let n=parseInt(document.getElementById('randomCount').value)||20;n=Math.max(1,Math.min(n,filteredVocab.length));
+            filteredVocab=[...filteredVocab].sort(()=>Math.random()-0.5).slice(0,n);
+            renderCards();showError(`Showing ${n} random cards!`,false);
+        }
+
+        // ==============================================
+        // 功能7：语音朗读(TTS)
+        // ==============================================
+        let useNaturalVoice=false;
+        function toggleVoice(){useNaturalVoice=!useNaturalVoice;const b=document.getElementById("voiceToggleBtn");b.textContent=useNaturalVoice?"Natural":"Normal";if(useNaturalVoice)preloadVoice();}
+        function preloadVoice(){if(!useNaturalVoice)return;const v=window.speechSynthesis.getVoices();const nv=v.find(vo=>vo.name.toLowerCase().includes('xiaoxiao')&&vo.name.toLowerCase().includes('natural'));if(nv){const u=new SpeechSynthesisUtterance(".");u.voice=nv;window.speechSynthesis.speak(u);showError(`Preloaded voice: ${nv.name}`,false);}}
+        window.speechSynthesis.onvoiceschanged=preloadVoice;
+        function speakWord(text){if(!window.speechSynthesis)return;window.speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(text);u.lang='zh-CN';u.rate=0.9;u.pitch=1.0;const v=window.speechSynthesis.getVoices();let cv;if(useNaturalVoice)cv=v.find(vo=>vo.name.toLowerCase().includes('xiaoxiao')&&vo.name.toLowerCase().includes('natural'))||v.find(vo=>vo.name.includes('Google 中文（普通话）'));else cv=v.find(vo=>vo.lang.includes('zh-CN')||vo.lang.includes('zh-TW')||vo.lang.includes('zh-HK'));if(cv)u.voice=cv;window.speechSynthesis.speak(u);}
+
+        // ==============================================
+        // 功能8：三层嵌套分组逻辑
+        // ==============================================
+        function getPinyinTone(p){const t={1:'āēīōū',2:'áéíóú',3:'ǎěǐǒǔ',4:'àèìòù'};for(let [n,c]of Object.entries(t))if([...c].some(ch=>p.includes(ch)))return`Tone ${n}`;return'Tone 0';}
+        function groupVocabulary(words){const g1=document.getElementById('groupLevel1').value,g2=document.getElementById('groupLevel2').value,g3=document.getElementById('groupLevel3').value;if(g1==='none')return{'All Words':words};const g={};const s=20;words.forEach(w=>{let k1='Other';if(g1==='fixedCount')k1=`Group ${Math.ceil(w.id/s)}`;if(g1==='idRange')k1=`ID ${Math.floor(w.id/100)*100}-${Math.floor(w.id/100)*100+99}`;if(g1==='pinyinInitial')k1=w.pinyin.trim().charAt(0).toUpperCase();if(g1==='charCount')k1=`${w.simplified.length} Char(s)`;let k2='Sub Group All';if(g2==='tone')k2=getPinyinTone(w.pinyin);if(g2==='charCount')k2=`${w.simplified.length} Char(s)`;if(g2==='pinyinInitial')k2=w.pinyin.trim().charAt(0).toUpperCase();if(g2==='fullPinyin')k2=w.pinyin;let k3='Sub Sub Group All';if(g3==='tone')k3=getPinyinTone(w.pinyin);if(g3==='charCount')k3=`${w.simplified.length} Char(s)`;if(g3==='pinyinInitial')k3=w.pinyin.trim().charAt(0).toUpperCase();if(g3==='fullPinyin')k3=w.pinyin;const fk=`${k1} | ${k2} | ${k3}`;if(!g[fk])g[fk]=[];g[fk].push(w);});return g;}
+
+        // ==============================================
+        // 功能9：卡片渲染（支持分组）
+        // ==============================================
+        function renderCards(){cardsContainer.innerHTML='';const hd=filteredVocab.length>0;emptyState.style.display=hd?'none':'block';updateStats();if(!hd)return;const m=document.getElementById('displayMode').value;const gd=groupVocabulary(filteredVocab);Object.entries(gd).forEach(([gn,ws])=>{const gs=document.createElement('div');gs.className='group-section';const gt=document.createElement('div');gt.className='group-title';gt.textContent=`📚 ${gn} (${ws.length} words)`;gs.appendChild(gt);const g=document.createElement('div');g.className='card-grid';ws.forEach(w=>{const c=document.createElement('div');c.className=`card ${learnedWords.has(w.id)?'learned':''}`;let ch='',st=w.simplified;switch(m){case'tc_only':ch=`<div class="primary-char">${w.traditional}</div>`;break;case'sc_only':ch=`<div class="primary-char">${w.simplified}</div>`;st=w.simplified;break;case'tc_sc':ch=`<div class="char-group"><div class="primary-char">${w.traditional}</div><div class="secondary-char">${w.simplified}</div></div>`;break;case'sc_tc':ch=`<div class="char-group"><div class="primary-char">${w.simplified}</div><div class="secondary-char">${w.traditional}</div></div>`;st=w.simplified;break;}const cc=document.getElementById('categorySelector').value||'All';c.innerHTML=`<div class="card-tooltip">分类: ${cc} | ID: ${w.id}</div>${ch}<div class="pinyin">${w.pinyin}</div><div class="meaning">${w.meaning}</div>`;c.addEventListener('click',()=>toggleLearnedState(w.id,c));c.addEventListener('mouseenter',()=>speakWord(st));g.appendChild(c);});gs.appendChild(g);cardsContainer.appendChild(gs);});}
+
+        // ==============================================
+        // 功能10：【新增】精准导出当前显示词汇
+        // 核心说明：导出数据源 = filteredVocab（页面实际显示的卡片）
+        // 匹配规则：严格同步分类/筛选/分组/排序/随机结果，无偏差
+        // 格式支持：CSV/Excel/Word，自带UTF-8 BOM解决中文乱码
+        // 修复：将所有单元格强制转为字符串，解决数字类型无replace方法报错
+        // ==============================================
+        function exportCurrentVocab() {
+            // 无显示数据时终止导出并提示
             if (!filteredVocab.length) {
-                showError("No vocabulary to randomize!", true);
+                showError("No displayed cards to export!", true);
                 return;
             }
 
-            const countInput = document.getElementById('randomCount');
-            let num = parseInt(countInput.value) || 20;
-            num = Math.max(1, Math.min(num, filteredVocab.length));
-            
-            const shuffled = [...filteredVocab].sort(() => Math.random() - 0.5);
-            filteredVocab = shuffled.slice(0, num);
-            renderCards();
-            showError(`Showing ${num} random cards!`, false);
-        }
+            // 获取用户选择的导出格式
+            const exportFormat = document.getElementById('exportFormat').value;
+            // 导出文件表头
+            const exportHeaders = ['ID', 'Traditional', 'Simplified', 'Pinyin', 'Meaning'];
+            // 导出数据：直接使用当前页面显示的词汇数组（已筛选/排序/分组）
+            const exportData = filteredVocab.map(item => [
+                item.id,
+                item.traditional,
+                item.simplified,
+                item.pinyin,
+                item.meaning
+            ]);
 
-        // ==================== 核心功能7：語音朗讀（TTS，相容中英文瀏覽器） ====================
+            // -------------------- 导出 CSV / Excel 格式 --------------------
+            if (exportFormat === 'csv' || exportFormat === 'excel') {
+                // 组装CSV内容，添加UTF-8 BOM防止中文乱码
+                // 🔥 修复点：强制将cell转为字符串 String(cell)，兼容数字/文本，解决replace报错
+                const csvRows = [
+                    exportHeaders.join(','),
+                    ...exportData.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+                ];
+                const csvContent = '\ufeff' + csvRows.join('\n');
 
-let useNaturalVoice = false; // 預設：不使用自然語音，由按鈕切換
-
-// 按鈕切換函式
-function toggleVoice() {
-    useNaturalVoice = !useNaturalVoice;
-    console.log("目前自然語音模式：", useNaturalVoice);
-
-    const btn = document.getElementById("voiceToggleBtn");
-    if (useNaturalVoice) {
-        btn.textContent = "Natural"; // 已經在自然語音模式
-	preloadVoice();
-    } else {
-        btn.textContent = "Normal"; // 已經在一般語音模式
-    }
-}
-
-// 預載 Xiaoxiao Natural 聲音（僅在 Edge 且使用者選擇自然語音時）
-function preloadVoice() {
-    if (!useNaturalVoice) return; // 使用者沒開啟自然語音 → 不預載
-
-    const voices = window.speechSynthesis.getVoices();
-    const naturalVoice = voices.find(v =>
-        v.name.toLowerCase().includes('xiaoxiao') &&
-        v.name.toLowerCase().includes('natural')
-    );
-    if (naturalVoice) {
-        const warmup = new SpeechSynthesisUtterance(".");
-        warmup.voice = naturalVoice;
-        window.speechSynthesis.speak(warmup);
-        console.log("Preloaded Edge voice:", naturalVoice.name);
-        showError(`Preloaded voice: ${naturalVoice.name}`, false);
-    }
-}
-
-// 當瀏覽器語音清單準備好時自動執行
-window.speechSynthesis.onvoiceschanged = preloadVoice;
-
-
-        function speakWord(text) {
-            if (!window.speechSynthesis) return;
-            window.speechSynthesis.cancel();
-
-            const utterance = new SpeechSynthesisUtterance(text);
-            utterance.lang = 'zh-CN';
-            utterance.rate = 0.9;
-            utterance.pitch = 1.0;
-
-            // 自動匹配中文語音
-            const voices = window.speechSynthesis.getVoices();
-
-
-            // 原來 : const chineseVoice = voices.find(v => v.lang.includes('zh-CN') || v.lang.includes('zh-TW')); 
-
-let chineseVoice;
-if (useNaturalVoice) {
-//  Prefer Xiaoxiao Natural first, then Google 中文（普通话）, fallback to any Chinese voice
-    chineseVoice = voices.find(v => v.name.toLowerCase().includes('xiaoxiao') && v.name.toLowerCase().includes('natural')) || voices.find(v => v.name.includes('Google 中文（普通话）')) 
-} else {
-    // Fallback: any Chinese voice
-    chineseVoice = voices.find(v => v.lang.includes('zh-CN') || v.lang.includes('zh-TW') || v.lang.includes('zh-HK')); 
-}
-
-
-            if (chineseVoice) utterance.voice = chineseVoice;
-
-            window.speechSynthesis.speak(utterance);
-        }
-
-        // ==================== 核心功能8：4種卡片顯示模式渲染 ====================
-        // 【新增】卡片渲染時加入Tooltip，顯示分類+ID，完全不影響原始功能
-        function renderCards() {
-            cardsContainer.innerHTML = '';
-            emptyState.style.display = filteredVocab.length ? 'none' : 'block';
-            updateStats();
-
-            if (!filteredVocab.length) return;
-            const mode = document.getElementById('displayMode').value;
-
-            filteredVocab.forEach(word => {
-                const card = document.createElement('div');
-                card.className = `card ${learnedWords.has(word.id) ? 'learned' : ''}`;
-                let charHtml = '';
-                let speakText = word.simplified; // 如預設朗讀繁體:  word.traditional
-
-                // 4種顯示模式邏輯（原始程式完全不動）
-                switch(mode) {
-                    case 'tc_only':
-                        charHtml = `<div class="primary-char">${word.traditional}</div>`;
-                        break;
-                    case 'sc_only':
-                        charHtml = `<div class="primary-char">${word.simplified}</div>`;
-                        speakText = word.simplified;
-                        break;
-                    case 'tc_sc':
-                        charHtml = `
-                            <div class="char-group">
-                                <div class="primary-char">${word.traditional}</div>
-                                <div class="secondary-char">${word.simplified}</div>
-                            </div>`;
-                        break;
-                    case 'sc_tc':
-                        charHtml = `
-                            <div class="char-group">
-                                <div class="primary-char">${word.simplified}</div>
-                                <div class="secondary-char">${word.traditional}</div>
-                            </div>`;
-                        speakText = word.simplified;
-                        break;
+                // 配置MIME类型与文件后缀
+                let mimeType, fileExtension;
+                if (exportFormat === 'csv') {
+                    mimeType = 'text/csv';
+                    fileExtension = 'csv';
+                } else {
+                    mimeType = 'application/vnd.ms-excel';
+                    fileExtension = 'xls'; // Excel原生兼容格式
                 }
 
-                // ==================== 新增：卡片懸浮Tooltip（分類+ID） ====================
-                // 取得當前詞彙所屬分類，預設為All Categories
-                const currentCategory = document.getElementById('categorySelector').value || 'All';
-                const tooltipHtml = `<div class="card-tooltip">分類: ${currentCategory} | ID: ${word.id}</div>`;
-
-                // 卡片HTML結構（原始結構+新增Tooltip）
-                card.innerHTML = `
-                    ${tooltipHtml}  <!-- 懸浮提示框 -->
-                    ${charHtml}
-                    <div class="pinyin">${word.pinyin}</div>
-                    <div class="meaning">${word.meaning}</div>
-                `;
-
-                card.addEventListener('click', () => toggleLearnedState(word.id, card));
-                card.addEventListener('mouseenter', () => speakWord(speakText));
-                cardsContainer.appendChild(card);
-            });
-        }
-
-        // ==================== 核心功能9：已學習詞彙管理（本機儲存） ====================
-        function toggleLearnedState(id, card) {
-            learnedWords.has(id) ? learnedWords.delete(id) : learnedWords.add(id);
-            card.classList.toggle('learned');
-            saveLearnedWords();
-            updateStats();
-        }
-
-        function clearLearned() {
-            if (!confirm('Clear all learned words?')) return;
-            learnedWords.clear();
-            saveLearnedWords();
-            renderCards();
-            showError('Learned words cleared!', false);
-        }
-
-        // 儲存已學習詞彙到本機
-        function saveLearnedWords() {
-            localStorage.setItem('learnedWords', JSON.stringify([...learnedWords]));
-        }
-
-        // 從本機載入已學習詞彙
-        function loadLearnedWords() {
-            const saved = localStorage.getItem('learnedWords');
-            if (saved) learnedWords = new Set(JSON.parse(saved));
-        }
-
-        // ==================== 工具函式 ====================
-        // 動態調整卡片大小
-        function updateCardSize() {
-            document.documentElement.style.setProperty('--card-size', document.getElementById('cardSize').value + 'px');
-        }
-
-        // 提示訊息顯示
-        function showError(text, isError) {
-            errorMsg.textContent = text;
-            errorMsg.className = isError ? 'error' : 'success';
-            errorMsg.style.display = 'block';
-            setTimeout(() => errorMsg.style.display = 'none', isError ? 7000 : 3000);
-        }
-
-        // ==================== CSV解析器（相容雙表頭格式） ====================
-        // 支援表頭：id,tc,sc,py,mean 和 id,traditional,simplified,pinyin,meaning
-        function parseCSVRobust(text) {
-            const lines = text.replace(/\r/g, '\n').split('\n').filter(l => l.trim());
-            if (!lines.length) throw new Error("Empty CSV file");
-
-            const headerMap = {
-                'id': 'id', 'tc': 'traditional', 'traditional': 'traditional',
-                'sc': 'simplified', 'simplified': 'simplified',
-                'py': 'pinyin', 'pinyin': 'pinyin',
-                'mean': 'meaning', 'meaning': 'meaning'
-            };
-
-            const rawHeaders = lines[0].split(',').map(h => h.trim().toLowerCase());
-            const headers = rawHeaders.map(h => headerMap[h] || h);
-
-            const required = ['id', 'traditional', 'simplified', 'pinyin', 'meaning'];
-            const missing = required.filter(col => !headers.includes(col));
-            if (missing.length) {
-                throw new Error(`Missing columns: ${missing.join(', ')}. Supported headers: id,tc,sc,py,mean`);
+                // 创建下载链接并触发下载
+                const blob = new Blob([csvContent], { type: mimeType });
+                const downloadUrl = URL.createObjectURL(blob);
+                const downloadLink = document.createElement('a');
+                downloadLink.href = downloadUrl;
+                downloadLink.download = `Chinese_Vocab_Displayed_${new Date().getTime()}.${fileExtension}`;
+                downloadLink.click();
+                URL.revokeObjectURL(downloadUrl);
             }
 
-            return lines.slice(1).map((line, idx) => {
-                const values = line.split(',').map(v => v.trim());
-                const getVal = (col) => values[headers.indexOf(col)] || '';
-                
-                return {
-                    id: parseInt(getVal('id')) || idx + 1,
-                    traditional: getVal('traditional'),
-                    simplified: getVal('simplified'),
-                    pinyin: getVal('pinyin'),
-                    meaning: getVal('meaning')
-                };
-            }).filter(v => v.simplified || v.traditional);
+            // -------------------- 导出 Word 格式 --------------------
+            if (exportFormat === 'word') {
+                // 生成Word兼容的HTML表格格式
+                let wordHtml = `<html>
+<head><meta charset="UTF-8"></head>
+<body>
+    <h2>Displayed Chinese Vocabulary List</h2>
+    <p>Export Time: ${new Date().toLocaleString()}</p>
+    <table border="1" cellpadding="8" cellspacing="0" width="100%">
+        <tr>${exportHeaders.map(header => `<th>${header}</th>`).join('')}</tr>
+        ${exportData.map(row => `<tr>${row.map(cell => `<td>${cell}</td>`).join('')}</tr>`).join('')}
+    </table>
+</body>
+</html>`;
+
+                // 创建下载链接并触发下载
+                const blob = new Blob(['\ufeff' + wordHtml], { type: 'application/msword' });
+                const downloadUrl = URL.createObjectURL(blob);
+                const downloadLink = document.createElement('a');
+                downloadLink.href = downloadUrl;
+                downloadLink.download = `Chinese_Vocab_Displayed_${new Date().getTime()}.doc`;
+                downloadLink.click();
+                URL.revokeObjectURL(downloadUrl);
+            }
+
+            // 导出成功提示
+            showError(`Successfully exported ${filteredVocab.length} displayed words!`, false);
         }
+
+        // ==============================================
+        // 功能11：已学习词汇管理（本地存储）
+        // ==============================================
+        function toggleLearnedState(id,c){learnedWords.has(id)?learnedWords.delete(id):learnedWords.add(id);c.classList.toggle('learned');saveLearnedWords();updateStats();}
+        function clearLearned(){if(!confirm('Clear all learned words?'))return;learnedWords.clear();saveLearnedWords();renderCards();showError('Learned words cleared!',false);}
+        function saveLearnedWords(){localStorage.setItem('learnedWords',JSON.stringify([...learnedWords]));}
+        function loadLearnedWords(){const s=localStorage.getItem('learnedWords');if(s)learnedWords=new Set(JSON.parse(s));}
+
+        // ==============================================
+        // 工具函数：卡片尺寸更新、提示框、CSV解析
+        // ==============================================
+        function updateCardSize(){document.documentElement.style.setProperty('--card-size',document.getElementById('cardSize').value+'px');}
+        function showError(text,isError){errorMsg.textContent=text;errorMsg.className=isError?'error':'success';errorMsg.style.display='block';setTimeout(()=>errorMsg.style.display='none',isError?7000:3000);}
+
+function parseCSVRobust(text){
+    const l=text.replace(/\r/g,'\n').split('\n').filter(i=>i.trim());
+    if(!l.length)throw new Error("Empty CSV file");
+    const map={'id':'id','tc':'traditional','traditional':'traditional','sc':'simplified','simplified':'simplified','py':'pinyin','pinyin':'pinyin','mean':'meaning','meaning':'meaning'};
+    const rh=l[0].split(',').map(h=>h.trim().toLowerCase());
+    const h=rh.map(i=>map[i]||i);
+    const req=['id','traditional','simplified','pinyin','meaning'];
+    const miss=req.filter(c=>!h.includes(c));
+    if(miss.length)throw new Error(`Missing columns: ${miss.join(', ')}. Supported headers: id,tc,sc,py,mean`);
+    // 🔥 修复点：取消数字转换，直接保留原始ID字符串
+    return l.slice(1).map((line,idx)=>{
+        const v=line.split(',').map(i=>i.trim());
+        const g=(c)=>v[h.indexOf(c)]||'';
+        // 原错误：id:parseInt(g('id'))||idx+1
+        // 新修复：直接读取原始ID，空ID则自动生成唯一ID
+        return{id:g('id') || `AUTO_${idx+1}`,traditional:g('traditional'),simplified:g('simplified'),pinyin:g('pinyin'),meaning:g('meaning')};
+    }).filter(v=>v.simplified||v.traditional);
+}
+
     </script>
 </body>
 </html>
