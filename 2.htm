@@ -42,7 +42,6 @@ body.noscroll { overflow:hidden; }
   });
 })();
 </script>
-
 <!DOCTYPE html>
 <html lang="zh-CN">
 <!-- ==============================================
@@ -283,6 +282,43 @@ body.noscroll { overflow:hidden; }
         <div class="control-group">
             <label>Import CSV (Max 5MB):</label>
             <input type="file" id="csvFile" accept=".csv" multiple>
+
+        <!-- 線上抓取 Online CSV URL-->
+        <span class="online-import-group" style="margin-top: 8px;">
+            <input type="url" id="csvUrl" list="defaultCsvList" placeholder="https://example.com/example.csv" style="width: 250px;">
+            <!-- 使用 datalist 定義您的預設選項 -->
+            <datalist id="defaultCsvList">
+                <option value="https://githubusercontent.com">🌸 範例1</option>
+                <option value="https://drawing30.github.io/pthwd1/1780108900295.csv">🚢 範例2</option>
+            </datalist>
+            <button type="button" id="fetchUrlBtn">Fetch Online CSV</button>
+        </span>
+        <script>
+document.getElementById('fetchUrlBtn').addEventListener('click', async () => {
+    const url = document.getElementById('csvUrl').value;
+    if (!url) return alert('請輸入有效的網址！');
+
+    try {
+        const response = await fetch(url);
+        if (!response.ok) throw new Error('網路回應失敗');
+        
+        // 檢查檔案大小（透過 Content-Length 標頭預估）
+        const contentLength = response.headers.get('Content-Length');
+        if (contentLength && parseInt(contentLength) > 5 * 1024 * 1024) {
+            return alert('檔案容量超過 5MB 限制！');
+        }
+
+        const csvText = await response.text();
+        console.log('CSV 線上資料讀取成功：', csvText);
+        // 接下來可在這裡執行 CSV 解析邏輯...
+        
+    } catch (error) {
+        alert('無法抓取該 CSV 檔案。請檢查主控台是否出現 CORS 或網路錯誤。');
+        console.error(error);
+    }
+});
+</script>
+
             <select id="categorySelector" style="display:none;"><option value="all">All Categories</option></select>
         </div>
 
@@ -380,6 +416,7 @@ body.noscroll { overflow:hidden; }
         // ==============================================
         function bindEvents() {
             document.getElementById('csvFile').addEventListener('change', handleCSVUpload);
+            document.getElementById('fetchUrlBtn').addEventListener('click', handleCSVUrlFetch);
             document.getElementById('search').addEventListener('input', applyAllFilters);
             document.getElementById('charFilter').addEventListener('change', applyAllFilters);
             document.getElementById('pinyinInitialFilter').addEventListener('change', applyAllFilters);
@@ -452,6 +489,44 @@ body.noscroll { overflow:hidden; }
                 reader.readAsText(file);
             }
         }
+
+         // 處理線上抓取CSV
+         async function handleCSVUrlFetch() {
+             const url = document.getElementById('csvUrl').value.trim();
+             if (!url) return alert('請輸入有效的 CSV 網址！');
+
+             try {
+                 const response = await fetch(url);
+                 if (!response.ok) throw new Error(`HTTP 錯誤: ${response.status}`);
+                 
+                 // 1. 檢查線上檔案大小限制（5MB）
+                 const contentLength = response.headers.get('Content-Length');
+                 if (contentLength && parseInt(contentLength) > 5 * 1024 * 1024) {
+                     return alert('該線上檔案超過 5MB 限制！');
+                 }
+         
+                 const csvText = await response.text();
+         
+                 // 2. 將線上抓到的文字，包裝成您原本 handleCSVUpload 認得的 File 物件格式
+                 const fileName = url.split('/').pop() || 'online_file.csv';
+                 const virtualFile = new File([csvText], fileName, { type: 'text/csv' });
+
+                 // 3. 模擬 change 事件的資料結構，直接傳給您原本的處理函式
+                 const mockEvent = {
+                     target: {
+                         files: [virtualFile]
+                     }
+                 };
+         
+                 // 🚀 直接啟動您原有的解析引擎
+                 await handleCSVUpload(mockEvent);
+         
+             } catch (error) {
+                 alert('無法抓取該線上 CSV！\n請檢查網址是否正確，或該伺服器是否遭遇 CORS 跨網域封鎖。');
+                 console.error(error);
+             }
+         }
+
 
         // ==============================================
         // 功能4：分类选择器更新
@@ -623,6 +698,9 @@ body.noscroll { overflow:hidden; }
         // ==============================================
         function updateCardSize(){document.documentElement.style.setProperty('--card-size',document.getElementById('cardSize').value+'px');}
         function showError(text,isError){errorMsg.textContent=text;errorMsg.className=isError?'error':'success';errorMsg.style.display='block';setTimeout(()=>errorMsg.style.display='none',isError?7000:3000);}
+/*
+        function parseCSVRobust(text){const l=text.replace(/\r/g,'\n').split('\n').filter(i=>i.trim());if(!l.length)throw new Error("Empty CSV file");const map={'id':'id','tc':'traditional','traditional':'traditional','sc':'simplified','simplified':'simplified','py':'pinyin','pinyin':'pinyin','mean':'meaning','meaning':'meaning'};const rh=l[0].split(',').map(h=>h.trim().toLowerCase());const h=rh.map(i=>map[i]||i);const req=['id','traditional','simplified','pinyin','meaning'];const miss=req.filter(c=>!h.includes(c));if(miss.length)throw new Error(`Missing columns: ${miss.join(', ')}. Supported headers: id,tc,sc,py,mean`);return l.slice(1).map((line,idx)=>{const v=line.split(',').map(i=>i.trim());const g=(c)=>v[h.indexOf(c)]||'';return{id:parseInt(g('id'))||idx+1,traditional:g('traditional'),simplified:g('simplified'),pinyin:g('pinyin'),meaning:g('meaning')};}).filter(v=>v.simplified||v.traditional);}
+(更正)保留 CSV 中原始字符串 ID:*/
 
 function parseCSVRobust(text){
     const l=text.replace(/\r/g,'\n').split('\n').filter(i=>i.trim());
@@ -646,4 +724,3 @@ function parseCSVRobust(text){
     </script>
 </body>
 </html>
-
